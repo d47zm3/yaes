@@ -1,0 +1,9 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function enumerate_nfs
+{
+  decho_green "enumerating nfs..."
+  showmount -e ${target} &> ${logs_path}/${target}/nfs.log
+}

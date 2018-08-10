@@ -1,0 +1,91 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function map_services_scans
+{
+  while read port 
+  do
+    port_raw=$( echo ${port} | grep -o "[0-9]*" )
+    egrep -q "^${port}" ${repository_root}/yaes/vars/mappings
+    if [[ ${?} -eq 0 ]]
+    then
+      service=$( egrep "^${port}" ${repository_root}/yaes/vars/mappings | awk ' { print $2 } ' )
+      decho "found ${service} at ${port}, starting detailed enumeration if module exists..."
+      case "${service}" in
+        "ssh") enumerate_ssh ${port_raw};;
+        "ftp") enumerate_ftp ${port_raw};;
+        "smtp") enumerate_smtp ${port_raw};;
+        "snmp") enumerate_snmp ${port_raw};;
+        "samba") enumerate_samba ${port_raw};;
+        "oracle") enumerate_oracle;;
+        "nfs") enumerate_nfs;;
+        "mysql") enumerate_mysql;;
+        "msrpc") enumerate_msrpc;;
+        "http") enumerate_http ${port_raw};;
+        *) decho "module for enumerating service ${service} does not exist...";;
+      esac
+    else
+      decho "non-standard port found, matching amap with protocol..."
+      service="unknown"
+      grep -q "http" ${amap_logs}/${target}.tcp.${port_raw}.amap.log
+      if [[ ${?} -eq 0 ]]
+      then
+        service="http"
+      fi
+      decho "found ${service} at ${port}, starting detailed enumeration if module exists..."
+      case "${service}" in
+        "ssh") enumerate_ssh;;
+        "ftp") enumerate_ftp;;
+        "smtp") enumerate_smtp;;
+        "snmp") enumerate_snmp;;
+        "samba") enumerate_samba ${port_raw};;
+        "oracle") enumerate_oracle;;
+        "nfs") enumerate_nfs;;
+        "mysql") enumerate_mysql;;
+        "msrpc") enumerate_msrpc;;
+        "http") enumerate_http ${port_raw};;
+        *) decho "could not identify service at port ${port}, skipping enumeration...";;
+      esac
+    fi
+  done < ${ports_file}
+}
+
+function enumerate_services
+{
+  decho "mapping protocols using amap..."
+  while read line 
+  do
+    port=$( echo "${line}" | awk ' { print $5 } ' )
+    port_raw=$( echo ${port} | grep -o "[0-9]*" )
+    echo ${port} >> ${ports_file}
+    decho "mapping ${port} for ${target}..."
+    if [[ "${port}" = *"tcp"* ]]
+    then
+      amap -A ${target} ${port} | grep Protocol | sed 's/Protocol/protocol/g' > ${amap_logs}/${target}.tcp.${port_raw}.amap.log
+    elif [[ "${port}" = *"udp"* ]]
+    then
+      amap -Au ${target} ${port} | grep Protocol | sed 's/Protocol/protocol/g' > ${amap_logs}/${target}.udp.${port_raw}.amap.log
+    fi
+  done < ${service_file}
+
+  if [[ ${no_tcp} -eq 0 ]]
+  then
+    while read mapping
+    do
+     decho_green "${mapping}"
+    done < ${amap_logs}/${target}.tcp.${port_raw}.amap.log
+  fi
+
+  if [[ ${no_udp} -eq 0 ]]
+  then
+    while read mapping
+    do
+     decho_green "${mapping}"
+    done < ${amap_logs}/${target}.udp.${port_raw}.amap.log
+  fi
+  
+  decho "starting detailed per-service enumeration..." 
+  map_services_scans
+}
+

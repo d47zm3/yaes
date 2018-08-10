@@ -1,0 +1,12 @@
+#!/bin/bash
+
+function enumerate_smtp
+{
+  port=${1}
+  decho_green "enumerating smtp..."
+  decho "grabbing banner..."
+  nmap -sS -sV -p ${port} -e ${iface} -n -Pn --script banner ${target} | grep banner 2>&1 | tee -a ${smtp_logfile} ${raw_logfile} > /dev/null
+  decho "enumerate with nmap..."
+  nmap --script=smtp-commands,smtp-enum-users,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720,smtp-vuln-cve2011-1764 -p 25 ${target} 2>&1 | tee -a ${smtp_logfile} ${raw_logfile} > /dev/null
+  smtp-user-enum -M VRFY -U /usr/share/wordlists/metasploit/unix_users.txt -t ${target} 2>&1 | tee -a ${smtp_logfile} ${raw_logfile} > /dev/null
+}

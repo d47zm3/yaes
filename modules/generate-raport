@@ -1,0 +1,153 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function generate_raport
+{
+  
+  if [[ ${samba_services} -eq 1 ]]
+  then
+    decho_green "found samba services! results below..."
+    dcat ${samba_logfile}
+  fi
+  
+  if [[ ${msrpc_services} -eq 1 ]]
+  then
+    decho_green "found msrpc services! results below..."
+    dcat ${msrpc_logfile}
+  fi
+  
+  if [[ ${ftp_services} -eq 1 ]]
+  then
+    decho_green "found ftp services! results below..."
+    dcat ${ftp_logfile}
+  fi
+  
+  if [[ ${ssh_services} -eq 1 ]]
+  then
+    decho_green "found ssh services! results below..."
+    dcat ${ssh_logfile}
+  fi
+  
+  if [[ ${dns_services} -eq 1 ]]
+  then
+    decho_green "found dns services! results below..."
+    dcat ${dns_logfile}
+  fi
+  
+  if [[ ${smtp_services} -eq 1 ]]
+  then
+    decho_green "found smtp services! results below..."
+    dcat ${smtp_logfile}
+  fi
+ 
+  if [[ ${snmp_services} -eq 1 ]]
+  then
+    decho_green "found snmp services! results below..."
+    dcat ${snmp_logfile}
+  fi
+
+  if [[ ${oracle_services} -eq 1 ]]
+  then
+    decho_green "found snmp services! results below..."
+    dcat ${snmp_logfile}
+  fi
+
+  if [[ ${web_services} -eq 1 ]]
+  then
+    decho_green "found web services! results below..."
+    decho "available methods..."
+    dcat ${http_methods_logfile}
+
+    decho "whatweb results..."
+    for file in ${whatweb_logs}/*
+    do
+      dcat ${file}
+      decho "enumerated version of components..."
+      components=( "apache" "mod_perl" "mod_python" "mod_ssl" "mod_throttle" "openssl" "webdav" )
+      for component in ${components[@]}
+      do
+        decho "$( cat ${file} | sed 's/\x1b\[[0-9;]*m//g' | egrep -io \"${component}\/[0-9\.]+\" | sort | uniq | tr '[:upper:]' '[:lower:]' )"
+      done
+    done
+
+    
+    decho "fimap results..."
+    for file in ${fimap_logs}/*
+    do
+      dcat ${file}
+    done
+
+    decho "webdav results..."
+    for file in ${webdav_logs}/*
+    do
+      dcat ${file}
+    done
+
+    decho "nikto results..."
+    echo ${nikto_logs}
+    for file in ${nikto_logs}/*
+    do
+      address=$( cat ${file} | grep "Target IP" | awk ' { print $NF } ' )
+      port=$( cat ${file} | grep "Target Port" | awk ' { print $NF } ' )
+      dcat ${file}
+    done
+
+    found_dirs=( )
+
+    decho "gobuster results..."
+    echo "$gobuster_logs"
+    for file in ${gobuster_logs}/*
+    do
+      address=$( cat ${file} | egrep -o "http://.*" )
+      decho "directories for ${address}..."
+      dcat "${file}" | egrep -i "status:" | sort
+      echo "file $file"
+    done
+
+    if [[ ${wp_found} -eq 1 ]]
+    then
+      decho_green "wordpress instance enumeration..."
+      dcat "${wpscan_logs}/${target}.tcp.*.wpscan"
+    fi
+  fi
+}
+
+function partial_results
+{
+    #decho "http logfile..."
+    #dcat ${http_logfile}
+
+    decho_green "*****************************************"
+    decho_green "*********** nikto results ***************"
+    decho_green "*****************************************"
+    decho ""
+
+    for file in ${nikto_logs}/*
+    do
+      lines=$( cat ${file} | wc -l )
+      if [[ ${lines} -ge 100 ]]
+      then
+        decho_red "nikto's output grow too big, possible false positives... skipping displaying"
+      else
+        address=$( cat ${file} | grep "Target IP" | awk ' { print $NF } ' | head -n1)
+        port=$( cat ${file} | grep "Target Port" | awk ' { print $NF } ' | head -n1 )
+        decho_green "found web server ${address}/${port} info/issues..."
+        dcat ${file}
+      fi
+    done
+
+    found_dirs=( )
+
+    decho_green "*****************************************"
+    decho_green "*********** gobuster results ************"
+    decho_green "*****************************************"
+    decho ""
+
+    for file in ${gobuster_logs}/*
+    do
+      #address=$( cat ${file} | egrep -o "http://.*" )
+      decho "directories found"
+      dcat ${file} | egrep -i "status:" | sort
+    done
+}

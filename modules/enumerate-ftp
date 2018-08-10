@@ -1,0 +1,19 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function enumerate_ftp
+{
+  port=${1}
+  ftp_services=1
+  decho_green "enumerating ftp..."
+  decho "grabbing banner..."
+  nmap -sS -sV -p ${port} -e ${iface} -n -Pn --script banner ${target} | grep banner 2>&1 | tee -a ${ftp_logfile} ${raw_logfile} > /dev/null
+  decho_green "trying to download files as anonymous user from ftp server..."
+  cd ${target}/files
+  wget -rq ftp://${target}:${port} --ftp-user=username --ftp-password=password 2>&1 |  tee -a ${ftp_logfile} ${raw_logfile} > /dev/null
+  cd ../..
+  decho "further enumeration..."
+  #nmap --script=ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,ftp-vsftpd-backdoor,ftp-vuln-cve2010-4221,tftp-enum -p 21 -e ${iface} ${target}
+  #nmap --script=ftp-* -p 21 -e ${iface} ${target}
+}

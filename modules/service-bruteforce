@@ -1,0 +1,10 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function service_bruteforce
+{
+  decho_green "quick brute force on ${service} using ${username} as login in background..."
+  hydra -t 20 -l ${username} -P ${hydra_quick_wordlist} ${target} ${service} &> ${hydra_logs}/${target}.tcp.${port}.${service}.hydra &
+  long_jobs_pids+=(${!})
+}

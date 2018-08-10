@@ -1,0 +1,50 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+
+function vulnerability_scan
+{
+  mode=${1}
+
+  decho "looking for quick wins..."
+  if [[ "${mode}" == "quick" ]]
+  then
+    decho_green "scanning for vulnerabilities using nmap, quick mode..."
+    if [[ ${developer_mode} -eq 0 ]]
+    then
+      nmap -Pn -T4 --script="*-vuln-*,smb-vuln-ms08-067" ${target} 2>&1 | tee ${vulnerabilities_logfile} ${raw_logfile} > /dev/null   #&> ${logs_path}/${target}/vulnerabilities.scan.log 
+    fi
+  fi
+
+  if [[ "${mode}" == "full" ]]
+  then
+    decho_green "scanning for vulnerabilities using nmap, full mode..."
+    if [[ ${developer_mode} -eq 0 ]]
+    then
+    nmap --script="smb2-capabilities,smb-print-text,smb2-security-mode.nse,smb-protocols,smb2-time.nse,smb-psexec,smb2-vuln-uptime,smb-security-mode,smb-server-stats,smb-double-pulsar-backdoor,smb-system-info,smb-vuln-conficker,smb-enum-groups,smb-vuln-cve2009-3103,smb-enum-processes,smb-vuln-cve-2017-7494,smb-vuln-ms06-025,smb-enum-shares,smb-vuln-ms07-029,smb-enum-users,smb-vuln-ms08-067,smb-vuln-ms10-054,smb-ls,smb-vuln-ms10-061,smb-vuln-ms17-010,smb-os-discovery,smb-vuln-ms08-067" --script-args=unsafe=1 -T4 ${target} 2>&1 | tee -a ${vulnerabilities_logfile} ${raw_logfile} > /dev/null
+    fi
+  fi
+
+  cat ${logs_path}/${target}/vulnerabilities.scan.log | egrep -A3 "smb-vuln-ms08-067" | grep -q "State: VULNERABLE"
+  if [[ ${?} -eq 0 ]]
+  then
+    decho_green "winner, winner, chicken, dinner! seems like host is vulnerable to ms08-067, you can try this one or ms03_026_dcom?"
+  fi
+  cat ${logs_path}/${target}/vulnerabilities.scan.log | egrep -i -A3 "smb-vuln-ms10-054" | grep -iq "State: VULNERABLE"
+  if [[ ${?} -eq 0 ]]
+  then
+    decho_green "winner, winner, chicken, dinner! seems like host is vulnerable to ms10-054"
+  fi
+  cat ${logs_path}/${target}/vulnerabilities.scan.log | egrep -i -A3 "smb-vuln-ms10-061" | grep -iq "State: VULNERABLE"
+  if [[ ${?} -eq 0 ]]
+  then
+    decho_green "winner, winner, chicken, dinner! seems like host is vulnerable to ms10-054"
+  fi
+  cat ${logs_path}/${target}/vulnerabilities.scan.log | egrep -i -A3 "smb-vuln-ms17-010" | grep -iq "State: VULNERABLE"
+  if [[ ${?} -eq 0 ]]
+  then
+    decho_green "winner, winner, chicken, dinner! seems like host is vulnerable to ms17-010"
+  fi
+
+}

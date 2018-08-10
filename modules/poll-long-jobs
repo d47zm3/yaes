@@ -1,0 +1,56 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function poll_long_jobs
+{
+  decho "checking long running scans..." 
+  
+  finished=0
+
+  decho "waiting for long scans to finish..."
+
+  while [[ finished -eq 0 ]]
+  do
+    all_done=1
+
+    if [[ ${skip_tcp} -eq 0 ]]
+    then
+      if ps -p ${tcp_deep_scan} > /dev/null
+      then
+        decho "tcp deep scan still running... $( ps -p ${tcp_deep_scan} --no-headers | awk ' { print $NF } ' )"
+        all_done=0
+      fi
+    fi
+
+    if [[ ${skip_udp} -eq 0 ]]
+    then
+      if ps -p ${udp_deep_scan} > /dev/null
+      then
+        decho "udp deep scan still running... $( ps -p ${udp_deep_scan} --no-headers | awk ' { print $NF } ' )"
+        all_done=0
+      fi
+    fi
+
+    if [[ ${all_done} -eq 1 ]]
+    then
+      finished=1
+    fi
+
+    sleep 30
+  done
+
+  if [[ ${skip_tcp} -eq 0 ]]
+  then
+    decho_green "displaying tcp deep scan results..."
+    dcat ${nmap_logs}/${target}.nmap.tcp.deep.output.log
+  fi
+
+  if [[ ${skip_udp} -eq 0 ]]
+  then
+    decho_green "displaying udp deep scan results..."
+    dcat ${nmap_logs}/${target}.nmap.udp.deep.output.log
+  fi
+
+  decho_green "yaes has finished!"
+}

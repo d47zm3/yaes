@@ -1,0 +1,9 @@
+#!/bin/bash
+
+target=${1}
+
+source /root/.yaes.conf
+
+. "${repository_root}/yaes/modules/common-header"
+
+parse_arguments "${@}"

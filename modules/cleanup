@@ -1,0 +1,18 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function cleanup_yaes
+{
+  decho_green "cleanup after running yaes..."
+  # get pid of yaes
+  parent_pid=$( ps -ef | grep bash | grep yaes | grep -v "cleanup" | awk ' { print $2 } ' )
+  if [[ ! -z ${parent_pid} ]]
+  then
+    # kill all processes underneath
+    decho "killing processes under parent ${parent_pid} parent..."
+    kill -9 -$(ps -o pgid= ${parent_pid} | grep -o '[0-9]*')
+  else
+    decho_red "no yaes process found!"
+  fi
+}

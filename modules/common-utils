@@ -1,0 +1,221 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/vars/global_vars"
+
+function check_scan_status
+{
+  if [[ ! -e ${status_file} ]]
+  then
+    echo 0 > ${status_file}
+    return 0
+  fi
+
+  if [[ -e ${status_file} ]]
+  then
+    grep -q 0 ${status_file}
+    if [[ ${?} -eq 0 ]]
+    then
+      return 0
+    else
+      return 1
+    fi
+  fi
+}
+
+function get_target_ip
+{
+  getent hosts ${target} | awk '{ print $1 }'
+}
+
+function decho
+{
+  string=${1}
+  echo -e "[$( date +'%H:%M:%S' )] ${string}"
+}
+
+function decho_red
+{
+  string=${1}
+  echo -e  "${red}[$( date +'%H:%M:%S' )] ${string}${no_color}"
+}
+
+function decho_green
+{
+  string=${1}
+  echo -e "${green}[$( date +'%H:%M:%S' )] ${string}${no_color}"
+}
+
+function dcat
+{
+  file="${1}"
+  trash="Unrecognised command. Type 'help' for a list of commands.|OPEN            FAIL:|405 Method Not Allowed|fimap v.1.00_svn (My life for Aiur)|:: by Iman Karim (fimap.dev@gmail.com)|:: Automatic LFI/RFI scanner and exploiter|Starting Nmap 7.60 ( https://nmap.org )|"
+
+  cat "${file}" | while read line
+  do
+    decho_green "${line}"
+    #echo -e "[$( date +'%H:%M:%S' )] ${line}"
+  done
+}
+
+
+
+function echo_green
+{
+  string=${1}
+  echo -e "${green}${string}${no_color}"
+}
+
+function check_dependencies
+{
+  decho "checking for required tools if they are present..."
+  tools=( nmap nikto gobuster wpscan amap hydra searchsploit smbclient twistd )
+  for tool in ${tools[@]}
+  do
+    which ${tool} 1>/dev/null
+    if [[ ${?} -eq 1 ]]
+    then
+      decho "${tool} not present, please install it or add to default path..."
+      exit 1
+    fi
+  done
+}
+
+function create_structure
+{
+  # raw-logs - contains raw output from tools like scanners
+  # sec-lits - contains symlinks to shared sec-lists for general use
+  # common - most common scripts for privilege checks, enumeration etc.
+  # exploits - most common pre-compiled exploits - shared among all machines
+  # files - contains downloaded files
+  # custom - place for custom things prepared for this target only (small scripts and such)
+  # walkthrough.md - whole walkthrough for machine
+  # notes.md - contains collected notes/tricks used - shared among all machines
+  # create/populate base dir for target
+  for dir in "raw-logs" "files" "workspace" "custom"
+  do
+    if [[ ! -d ${target}/${dir} ]]
+    then
+      mkdir -p ${target}/${dir}
+    fi
+  done
+
+  for file in "walkthrough.md" "notes.md"
+  do
+    if [[ ! -e ${target}/${file} ]]
+    then
+      touch ${target}/${file}
+    fi
+  done
+
+  for symlink in "sec-lists" "common" "exploits"
+  do
+    ln -sf ${repository_root}/${symlink}/ ${target}/
+  done
+
+  mkdir -p ${logs_path}/${target}
+  mkdir -p ${nmap_logs}
+  mkdir -p ${amap_logs}
+}
+
+function check_file_type
+{
+  path=${1}
+  file_output=$( file ${path} )
+  if [[ ${file_output} = *"Bourne"* ]]
+  then
+    echo "bash"
+  elif [[ ${file_output} = *"Perl"* ]]
+  then
+    echo "perl"
+  elif [[ ${file_output} = *"C source"* ]]
+  then
+    echo "c"
+  elif [[ ${file_output} = *"Python"* ]]
+  then
+    echo "python"
+  elif [[ ${file_output} = *"ELF"* ]]
+  then
+    echo "elf"
+  elif [[ ${file_output} = *"PE32"* ]]
+  then
+    echo "windows"
+  else
+    echo "other"
+  fi
+}
+
+function help
+{
+    decho_green "usage: ${0} [--help] <hostname/ip>"
+    #decho "or... --enumerate - this will run standalone enumeration on linux box and print output"
+    decho "or... --web-proxy <target> <port> - this will run socat and let you access website over your hacking box port ${proxy_port}"
+    decho "or... --http-server [download client] [file] - runs simple http server, shows ready to copy & paste commands to run all kinds of scripts, enumeration, post-exploitation etc. using chosen client on target (wget by default), filter by [filename]"
+    decho "or... --ftp-server <filename> - runs ftp server in current directory, prints commands to download file to windows host using it"
+    decho "or... --samba-server <filename> - runs samba server in current directory, prints commands to access file on windows host using it"
+    decho "or... --linux-exploit <uname string> - runs linux exploit suggester given uname string"
+    decho "or... --socat-shell <port> - start local socat listener on chosen port, print client connect command"
+    decho "or... --payloads - prints msfvenomn payload cheatsheet"
+    decho "or... --windows-exploit <systeminfo logfile> - pass systeminfo to local windows-exploit-suggester, runs it, makes suggestion on reliable exploits"
+    decho "or... --cleanup - kill running yaes and all it's childs"
+    #decho "or... --sherlock <target workspace directory> - runs simple http server, serves nc.exe to automate pass of Sherlock.ps1 script output"
+}
+
+function display_banner
+{
+  echo_green "[********] yaes - v1.0 by d47zm3"
+}
+
+function cleanup
+{
+  vulnerabilities_logfile="${logs_path}/${target}/vulnerabilities.scan.log"
+  samba_logfile="${logs_path}/${target}/samba.log"
+  msrpc_logfile="${logs_path}/${target}/msrpc.log"
+  ftp_logfile="${logs_path}/${target}/ftp.log"
+  ssh_logfile="${logs_path}/${target}/ssh.log"
+  smtp_logfile="${logs_path}/${target}/smtp.log"
+  snmp_logfile="${logs_path}/${target}/snmp.log"
+  http_logfile="${logs_path}/${target}/http.log"
+  http_methods_logfile="${nmap_logs}/${target}.http_methods"
+  oracle_logfile="${logs_path}/${target}/oracle.log"
+
+  files_to_clean=( "${service_file}" "${ports_file}" "${raw_logfile}" "${vulnerabilities_logfile}" "${samba_logfile}" "${initial_scan_logfile}"  "${tcp_quick_logfile}" "${udp_scan_logfile}" "${msrpc_logfile}" "${ftp_logfile}" "${ssh_logfile}" "${smtp_logfile}" "${snmp_logfile}" "${http_logfile}" "${oracle_logfile}" "${mysql_logfile}" "${http_methods_logfile}")
+  for clean_file in ${files_to_clean[@]}
+  do
+    if [[ -e ${clean_file} ]]
+    then
+      > ${clean_file}
+    fi
+  done
+
+  if [[ ! -z ${logs_path} ]] && [[ ! -z ${target} ]]
+  then
+    if [[ -d ${logs_path}/${target} ]]
+    then
+      decho "found previous scan directory, cleaning up..."
+      rm -rf ${logs_path}/${target}/whatweb/*
+    fi
+  fi
+
+  echo 0 > ${http_enumeration_lock}
+
+  #> ${service_file}
+  #> ${ports_file}
+  #> ${raw_logfile}
+  #> ${vulnerabilties_logfile}
+  #> ${samba_logfile}
+}
+
+function load_config
+{
+  current_dir=$( pwd )
+  display_banner
+  decho "loading config file from ${config_path}..."
+  source ${config_path}
+  cd ${current_workspace}
+  local_ip=$( ip -f inet -o addr show ${iface} | cut -d\  -f 7 | cut -d/ -f 1 )
+  decho "using interface ${iface}"
+  create_structure
+  decho_green "raw logs are outputted to ${raw_logfile} => use tail/less to preview it"
+  cleanup
+}
+

@@ -1,0 +1,25 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function web_proxy
+{
+    target=${1}
+    target_port=${2}
+    if [[ -z ${target} ]] || [[ -z ${target_port} ]]
+    then
+      decho_red "wrong usage!"
+      help
+      exit 1
+    fi
+    source ${config_path}
+    netstat -tulpen | egrep -q ":${proxy_port}[ ]+"
+    if [[ ${?} -eq 0 ]]
+    then
+      decho_red "found other process listening on port ${web_port}, terminating..."
+      exit 1
+    fi
+    local_ip=$( ip -f inet -o addr show ${web_iface} | cut -d\  -f 7 | cut -d/ -f 1 )
+    decho_green "serving web-proxy to ${target}/${target_port} on ${local_ip} on port ${proxy_port}, access via: http://${local_ip}:${proxy_port}/ - press ctrl+c to stop it"
+    socat TCP-LISTEN:${proxy_port},fork TCP:${target}:${target_port} &> /dev/null
+}

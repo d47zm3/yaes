@@ -1,0 +1,32 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function ftp_server
+{
+  file=${1}
+  if [[ -z ${file} ]]
+  then
+    file="<your filename here>"
+  fi
+  netstat -tulpen | egrep -q ":21[ ]+"
+  if [[ ${?} -eq 0 ]]
+  then
+    decho_red "found other process listening on port 21, terminating..."
+    exit 1
+  fi
+  decho_green "setting up ftp server for files in $( pwd ) directory..."
+  local_ip=$( ip -f inet -o addr show ${iface} | cut -d\  -f 7 | cut -d/ -f 1 )
+  decho "paste commands below to windows host..."
+  echo "echo open ${local_ip} 21 > ftp.txt"
+  echo "echo user anonymous >> ftp.txt"
+  echo "echo password >> ftp.txt"
+  echo "echo bin >> ftp.txt"
+  echo "echo prompt >> ftp.txt"
+  echo "echo mget ${file} >> ftp.txt"
+  echo "echo bye >> ftp.txt"
+  echo "ftp -i -n -s:ftp.txt"
+  echo ""
+  decho_green "press ctrl+c to stop ftp server..."
+  twistd -n ftp -p 21 -r . &> /dev/null
+}

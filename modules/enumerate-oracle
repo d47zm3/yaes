@@ -1,0 +1,9 @@
+#!/bin/bash
+
+function oracle_enumeration
+{
+  decho_green "enumerating oracle..."
+  oracle_servces=1
+  tnscmd10g version -h ${target} &> ${logs_path}/${target}/oracle.log
+  tnscmd10g status -h ${target} &> ${logs_path}/${target}/oracle.log
+}

@@ -1,0 +1,75 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+
+function wait_loop
+{
+
+  #if check_status
+  #then
+  #  return 0
+  #fi
+
+  finished=0
+  progress=0
+
+  decho "waiting for long scans to finish..."
+
+  while [[ finished -eq 0 ]]
+  do
+    all_done=1
+    for job in ${long_jobs_pids[@]}
+    do
+      if  ps -p ${job} > /dev/null
+      then
+        decho "job ${job} still running..."
+        all_done=0
+      fi
+    done
+
+    progress=$((progress+1))
+
+    if [[ ${all_done} -eq 1 ]]
+    then
+      finished=1
+    fi
+
+    if [[ ${progress} -eq 6 ]]
+    then
+      decho_red "scan still not finished, partial results, so you can start looking..."
+      if [[ ${web_services} -eq 1 ]]
+      then
+        partial_results
+      fi
+      progress=0
+    fi
+    sleep 20
+  done
+
+  if [[ ${no_tcp} -eq 0 ]]
+  then
+    decho "checking status of tcp deep ports scan..."
+    if  ps -p ${tcp_deep_scan} > /dev/null
+      then
+        decho_red "tcp deep scan still not finished, will poll for status after displaying raport... partial results!" 
+      else
+        decho_green "tcp deep scan finished!"
+      fi
+      dcat "${nmap_logs}/${target}.nmap.tcp.deep.output.log"
+  fi
+
+
+  if [[ ${no_udp} -eq 0 ]]
+  then
+    decho "checking status of udp deep ports scan..."
+    if  ps -p ${udp_deep_scan} > /dev/null
+      then
+        decho "udp deep scan still not finished, will poll for status after displaying raport..." 
+    else
+        decho "udp deep scan finished!"
+    fi
+    dcat "${nmap_logs}/${target}.nmap.tcp.deep.output.log"
+  fi
+
+}

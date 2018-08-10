@@ -1,0 +1,84 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function initial_scan
+{
+  fake_http="ncacn_http|vnc-http|http-rpc-epmap"
+  load_config
+  if [[ ${developer_mode} -eq 1 ]]
+  then
+    decho_red "developer mode turned on, skipping long scans, reusing existing log files..."
+  fi
+
+  decho "starting stealth scan for ${target} ($( get_target_ip ))..."
+  if [[ ${developer_mode} -eq 0 ]]
+  then
+    nmap -T3 -sS -e ${iface} ${target} | grep "open" 2>&1 | tee -a ${initial_scan_logfile} ${raw_logfile} > /dev/null
+  fi
+  cat ${initial_scan_logfile} | while read line
+  do
+    decho_green "found ${line}"
+    echo ${line} | grep "open" | egrep -v "${fake_http}" | grep -q "http"
+    if [[ ${?} -eq 0 ]]
+    then
+      port=$( echo ${line} | grep "open" | egrep -v "${fake_http}" |  grep "http" | egrep -o "^[0-9]+" )
+      decho_green "found web services at port ${port}, launching enumeration in background..."
+      enumerate_http ${port}
+    fi
+  done
+  #done < ${initial_scan_logfile}
+
+  if [[ ${skip_tcp} -eq 0 ]]
+  then
+    decho "starting service scan (tcp)..."
+    if [[ ${developer_mode} -eq 0 ]]
+    then
+      nmap -T3 -sV -sC -O -e ${iface} ${target} 2>&1 | tee -a ${tcp_quick_logfile} ${raw_logfile} > /dev/null
+    fi
+    decho "nmap quick scan results for tcp..."
+    tcp_ports_count=$( cat ${tcp_quick_logfile} | grep -v "Not shown" | grep open | wc -l )
+    if [[ ${tcp_ports_count} -ne 0 ]]
+    then
+      cat ${tcp_quick_logfile} | grep -v "Not shown" | egrep -i "(tcp|udp)[ \t]*open" | awk -v date="$(date +"%H:%M:%S")" ' { print "\033[32m[" date "] found open port " $1 " for service " $3  "\033[0m" } ' | tee -a ${service_file}
+    else
+      decho_red "no open tcp ports found!"
+      no_tcp=1
+    fi
+    decho "starting long deep tcp scan in background..."
+    if [[ ${developer_mode} -eq 0 ]]
+    then
+      nmap -T4 -A -p- -sV -sC -O -oX ${nmap_logs}/${target}.nmap.tcp.deep.output.xml -e ${iface} ${target} &> ${nmap_logs}/${target}.nmap.tcp.deep.output.log &
+      tcp_deep_scan=${!}
+    fi
+  else
+    no_tcp=1
+  fi
+  
+  if [[ ${skip_udp} -eq 0 ]]
+  then
+    decho "starting service scan (udp)..."
+    if [[ ${developer_mode} -eq 0 ]]
+    then
+      nmap -T4 -sU -sV -sC -O -e ${iface} ${target} 2>&1 | tee -a ${udp_quick_logfile} ${raw_logfile} > /dev/null
+    fi
+    decho "nmap quick scan results for udp..."
+    udp_ports_count=$( cat ${udp_quick_logfile} | grep -v "Not shown" | grep -v "open\|filtered" | grep open | wc -l )
+    if [[ ${udp_ports_count} -ne 0 ]]
+    then
+      cat ${nmap_logs}/${target}.udp.nmap.quick.log | grep -v "Not shown" | grep -v "open\|filtered" | egrep -i "(tcp|udp) open" |  grep open | awk -v date="$(date +"%H:%M:%S")" ' { print "\033[32m[" date "] found open port " $1 " for service " $3  "\033[0m" } ' | tee -a ${service_file}
+    else
+      decho_red "no open udp ports found!"
+      no_udp=1
+    fi
+    decho "starting long deep udp scan in background..."
+    if [[ ${developer_mode} -eq 0 ]]
+    then
+      nmap -T4 -sU -p- -sC -oX  ${nmap_logs}/${target}.nmap.udp.deep.output.xml -e ${iface} ${target} &> ${nmap_logs}/${target}.nmap.udp.deep.output.log &
+      udp_deep_scan=${!}
+    fi
+  else
+    decho_red "udp scan is disabled in config file, skipping udp services..."
+    no_udp=1
+  fi
+}

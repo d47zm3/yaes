@@ -1,0 +1,22 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function samba_server
+{
+  decho_green "setting up samba share for files in $( pwd ) directory..."
+  file=${1}
+  if [[ -z ${file} ]]
+  then
+    file="<your filename here>"
+  fi
+  local_ip=$( ip -f inet -o addr show ${iface} | cut -d\  -f 7 | cut -d/ -f 1 )
+  decho "paste commands below on windows host to access file over samba..."
+  #for file in $( ls  )
+  #do
+    echo "\\\\${local_ip}\\\\${file}"
+  #done
+  echo ""
+  decho_green "press ctrl+c to stop samba server..."
+  impacket-smbserver master $( pwd ) &> /dev/null
+}

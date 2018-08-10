@@ -1,0 +1,13 @@
+#!/bin/bash
+
+. "common-utils"
+
+function enumerate_snmp
+{
+  decho_green "enumerating snmp..."
+  nmap -vv -sV -sU -Pn -p 161,162 --script=snmp-netstat,snmp-processes ${target} &> ${logs_path}/${target}/snmp.log
+  snmp-check -t ${target} -c public &>> ${logs_path}/${target}/snmp.log
+  snmp-check -t ${target} -c private &>> ${logs_path}/${target}/snmp.log
+  snmp-check -t ${target} -c community &>> ${logs_path}/${target}/snmp.log
+  onesixtyone -c names -i ${target} &>> ${logs_path}/${target}/snmp.log
+}

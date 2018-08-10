@@ -1,0 +1,37 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function parse_arguments
+{
+  argument=${1}
+  if [[ -z ${argument// } ]]
+  then
+    help
+    exit 0
+  fi
+  
+  if [[ "${argument}" =~ ^(--web-proxy|--http-server|--ftp-server|--samba-server|--linux-exploit|--windows-exploit|--socat-shell|--payloads|--cleanup|--help)$ ]]
+  then
+      case "${argument}" in
+        "--web-proxy") web_proxy ${2} ${3} ;;
+        "--http-server") http_server ${2} ${3} ;;
+        "--ftp-server") ftp_server ${2} ;;
+        "--samba-server") samba_server ${2} ;;
+        "--linux-exploit") linux_exploit_suggester "${2}" ;;
+        "--windows-exploit") windows_exploit_suggester "${2}" ;;
+        "--socat-shell") socat_shell "${2}" ;;
+        "--payloads") print_payloads ;;
+        "--cleanup") cleanup_yaes ;;
+        "--help") help ;;
+      *) decho_red "operation ${argument} not found! read help!" help;
+      esac
+  else
+    initial_scan ${target}
+    vulnerability_scan "quick"
+    enumerate_services
+    wait_loop
+    generate_raport
+    poll_long_jobs
+  fi
+}

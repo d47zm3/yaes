@@ -1,0 +1,10 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function enumerate_msrpc
+{
+  msrpc_services=1
+  decho_green "enumerating msrpc..."
+  nmap -Pn -e ${iface} --script=msrpc-enum ${target} 2>&1 | tee -a ${msrpc_logfile} ${raw_logfile} > /dev/null
+}

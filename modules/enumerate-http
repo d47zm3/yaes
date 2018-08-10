@@ -1,0 +1,155 @@
+#!/bin/bash
+
+#https://github.com/maurosoria/dirsearch
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function enumerate_http
+{
+  port=${1}
+ 
+  http_enum=$( cat ${http_enumeration_lock} )
+  if [[ ${http_enum} -eq 0 ]]
+  then
+    web_services=1
+    decho_green "enumerating http..."
+    # usually services running on both 80/443 are the same, if met with two different ports for http, run scan for both non-standard ports
+    if [[ ${port} -eq 80 ]] || [[ ${port} -eq 443 ]]
+    then
+      echo 1 > ${http_enumeration_lock}
+    fi
+
+    mkdir -p ${nikto_logs}
+    mkdir -p ${whatweb_logs}
+    mkdir -p ${fimap_logs}
+    mkdir -p ${webdav_logs}
+    mkdir -p ${gobuster_logs}
+    #mkdir -p ${yasuo_logs}
+
+    decho "checking available methods on ${target}/${port}..."
+    if [[ ${developer_mode} -eq 0 ]]
+    then
+      nmap -p${port} --script=http-methods.nse ${target} 2>&1 | tee -a  ${http_methods_logfile} ${http_logfile} ${raw_logfile}  > /dev/null
+    fi
+    decho_green "these methos are supported: $( cat ${http_methods_logfile} | grep Supported | grep -o "[A-Z ]*$" | tr '[:upper:]' '[:lower:]' )"
+
+    if [[ ${port} -eq 443 ]] || [[ ${port} -eq 8443 ]]
+    then
+      protocol="https"
+    else
+      protocol="http"
+    fi
+
+    decho "running whatweb on ${target}/${port}..."
+
+    if [[ ${developer_mode} -eq 0 ]]
+    then
+      whatweb ${protocol}://${target}:${port}/  2>&1 | tee -a ${whatweb_logs}/${target}.tcp.${port}.whatweb ${http_logfile} ${raw_logfile} > /dev/null
+    fi
+
+    tomcat_found=0
+    decho "whatweb results..."
+    for file in ${whatweb_logs}/*
+    do
+      decho_green "$( cat ${file} | sed 's/\x1b\[[0-9;]*m//g' | tr '[:upper:]' '[:lower:]' )"
+      decho "enumerated version of components..."
+      components=( "apache" "mod_perl" "mod_python" "mod_ssl" "mod_throttle" "openssl" "webdav" "microsoft-iis" "dav" "tomcat" "apache-coyote") 
+      for component in ${components[@]}
+      do
+        component_version=$( cat ${file} | sed 's/\x1b\[[0-9;]*m//g' | egrep -io "${component}\/[0-9\.]+" | sort | uniq | tr '[:upper:]' '[:lower:]' )
+        if [[ ! -z "${component_version// }" ]]
+        then
+          decho_green "${component_version}"
+          if [[ "${component}" == "tomcat" ]]
+          then
+            tomcat_found=1
+          fi
+        fi
+      done
+    done
+
+    if [[ ${tomcat_found} -eq 1 ]]
+    then
+      decho "found tomcat, starting brute force manager process..."
+      tomcat_bruteforce ${target} ${port}
+      cat ${tomcat_bruteforce_logfile}  | grep http-get > "${tomcat_bruteforce_logfile}-result"
+      dcat "${tomcat_bruteforce_logfile}-result"
+    fi
+
+    decho "running fimap on ${target}/${port}..."
+
+    if [[ ${developer_mode} -eq 0 ]]
+    then
+      fimap -D -H -4 -u "${protocol}://${target}:${port}/" 2>&1 |  tee -a ${fimap_logs}/${target}.tcp.${port}.fimap ${http_logfile}  ${raw_logfile} > /dev/null
+    fi
+
+    decho "testing webdav..."
+
+    if [[ ${developer_mode} -eq 0 ]]
+    then
+      davtest -move -sendbd auto -url ${protocol}://${target}:${port}/ 2>&1 | tee -a ${webdav_logs}/${target}.tcp.${port}.webdav ${http_logfile} ${raw_logfile} > /dev/null
+      cadaver ${protocol}://${target}:${port}/ 2>&1 | tee -a  ${webdav_logs}/${target}.tcp.${port}.webdav ${http_logfile}  ${raw_logfile} > /dev/null
+    fi
+
+    if [[ ${developer_mode} -eq 0 ]]
+    then
+      nikto -host ${protocol}://${target}:${port}/ 2>&1 | tee -a  ${nikto_logs}/${target}.tcp.${port}.nikto  ${raw_logfile} > /dev/null &
+      long_jobs_pids+=(${!})
+    fi
+    decho "running nikto on ${target}/${port} in background..."
+    
+    decho "running quick gobuster on ${target}/${port}..."
+    gobuster -q -e -w ${gobuster_quick_wordlist} -u ${protocol}://${target}:${port}/ -r -t 50 2>&1 > ${gobuster_logs}/quick-${target}.tcp.${port}.gobuster
+    dcat ${gobuster_logs}/quick-${target}.tcp.${port}.gobuster
+
+    if [[ ${developer_mode} -eq 0 ]]
+    then
+      gobuster -q -e -w ${gobuster_long_wordlist} -u ${protocol}://${target}:${port}/ -r -t 200 2>&1 > ${gobuster_logs}/${target}.tcp.${port}.gobuster &
+    fi
+    long_jobs_pids+=(${!})
+    decho "running gobuster on ${target}/${port} in background..."
+
+    decho_green "launching yauso - web vulnerabiliy scanner!"
+
+    #if [[ ${developer_mode} -eq 0 ]]
+    #then
+    #  /opt/Yasuo/yasuo.rb -s /opt/Yasuo/signatures.yaml -r ${target} -n -t 20 -p ${port} &> ${yasuo_logs}/${target}.tcp.${port}.yasuo
+    #fi
+    #dcat ${yasuo_logs}/${target}.tcp.${port}.yasuo | grep "http"
+
+    check_wp "${protocol}://${target}:${port}/"
+  else
+    decho_red "http enumeration already done on other port (80?)..."
+  fi
+}
+
+function check_wp
+{
+  url=${1}
+  wp_found=0
+  decho "checking for presence of wordpress..."
+  curl -s -I -k ${url}/wp-content/ | grep "HTTP\/" | grep -q "404"
+  if [[ ${?} -eq 1 ]]
+  then
+    wp_found=1
+  fi
+  curl -s -I -k ${url}/wp-includes/ | grep "HTTP\/" | grep -q "404"
+  if [[ ${?} -eq 1 ]]
+  then
+    wp_found=1
+  fi
+  curl -s -I -k ${url}/wp-admin/ | grep "HTTP\/" | grep -q "404"
+  if [[ ${?} -eq 1 ]]
+  then
+    wp_found=1
+  fi
+
+  if [[ ${wp_found} -eq 1 ]]
+  then
+    decho_green "found possible wordpress instance, enumerating..."
+    mkdir -p "${wpscan_logs}"
+    wpscan --url ${url} --batch --no-banner --random-agent --enumerate u 2>&1 | tee -a  ${wpscan_logs}/${target}.tcp.${port}.wpscan ${raw_logfile} > /dev/null &
+    long_jobs_pids+=(${!})
+    decho "running wpscan on ${target}/${port} in background..."
+  fi
+}

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function enumerate_mysql
+{
+  mysql_services=1
+  decho_green "enumerating mysql disabled, broken..."
+  #nmap -sV -Pn -e ${iface} --script=mysql-audit,mysql-databases,mysql-dump-hashes,mysql-empty-password,mysql-enum,mysql-info,mysql-query,mysql-users,mysql-variables,mysql-vuln-cve2012-2122 ${target} -p 3306 &> ${logs_path}/${target}/mysql.log
+  #nmap -sV -Pn -e ${iface} --script=mysql* ${target} -p 3306 &> ${logs_path}/${target}/mysql.log
+}

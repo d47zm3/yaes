@@ -1,0 +1,9 @@
+#!/bin/bash
+
+function enumerate_ssh
+{
+  port=${1}
+  decho_green "enumerating ssh..."
+  decho "grabbing banner..."
+  nmap -sS -sV -p ${port} -e ${iface} -n -Pn --script banner ${target} | grep banner 2>&1 | tee -a ${ssh_logfile} ${raw_logfile} > /dev/null
+}
